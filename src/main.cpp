@@ -14,7 +14,7 @@
 
 static std::atomic<bool> running(true);
 static std::shared_timed_mutex algorithms_mutex;
-static std::vector<Algorithm> algorithms;
+static std::vector<Algorithm> algorithms;  // теперь вектор объектов, не указателей
 static std::string configDir;
 static std::filesystem::file_time_type last_config_load;
 
@@ -22,7 +22,6 @@ void signal_handler(int) {
     running = false;
 }
 
-// Функция перезагрузки конфигурации, вызываемая периодически
 void reloadConfigIfChanged() {
     namespace fs = std::filesystem;
     auto configDirPath = fs::path(configDir);
@@ -30,7 +29,6 @@ void reloadConfigIfChanged() {
 
     auto current_mtime = fs::last_write_time(configDirPath);
     bool changed = false;
-    // Также проверяем каждый файл .json внутри
     for (const auto& entry : fs::directory_iterator(configDirPath)) {
         if (entry.path().extension() != ".json") continue;
         auto file_mtime = fs::last_write_time(entry.path());
@@ -47,7 +45,7 @@ void reloadConfigIfChanged() {
     auto new_algorithms = ConfigLoader::loadFromDirectory(configDir);
     {
         std::unique_lock<std::shared_timed_mutex> lock(algorithms_mutex);
-        algorithms = std::move(new_algorithms);
+        algorithms = std::move(new_algorithms);  // теперь типы совпадают
         last_config_load = fs::file_time_type::clock::now();
     }
 }
@@ -59,7 +57,6 @@ int main(int argc, char* argv[]) {
     configDir = "/etc/oper/algorithms";
     if (argc > 1) configDir = argv[1];
 
-    // Первоначальная загрузка
     algorithms = ConfigLoader::loadFromDirectory(configDir);
     if (algorithms.empty()) {
         std::cerr << "OPer: No algorithms loaded. Exiting." << std::endl;
@@ -83,7 +80,6 @@ int main(int argc, char* argv[]) {
     while (running) {
         auto lines = monitor.getNewLines();
 
-        // Проверка конфигурации каждые 5 секунд
         auto now = std::chrono::steady_clock::now();
         if (std::chrono::duration_cast<std::chrono::seconds>(now - last_reload_check).count() >= 5) {
             reloadConfigIfChanged();
@@ -91,22 +87,18 @@ int main(int argc, char* argv[]) {
         }
 
         if (!lines.empty()) {
-            // Захватываем алгоритмы на чтение
             std::shared_lock<std::shared_timed_mutex> lock(algorithms_mutex);
             for (const auto& line : lines) {
                 for (const auto& algo : algorithms) {
                     if (std::regex_search(line, algo.pattern)) {
-                        // Проверяем cooldown
                         auto now = std::chrono::steady_clock::now();
                         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
                             now - algo.last_trigger).count();
                         if (elapsed >= algo.cooldown) {
                             std::cout << "OPer: Match found: " << line << std::endl;
 
-                            // Создаём копию алгоритма для асинхронного выполнения,
-                            // но оставляем shared_ptr, чтобы управлять временем жизни
+                            // Создаём shared_ptr из копии алгоритма для асинхронного выполнения
                             auto algo_copy = std::make_shared<Algorithm>(algo);
-                            algo_copy->last_trigger = now; // не обязательно, т.к. у копии своё время, но мы обновим оригинал
                             // Обновляем время последнего срабатывания в оригинале
                             const_cast<Algorithm&>(algo).last_trigger = now;
 

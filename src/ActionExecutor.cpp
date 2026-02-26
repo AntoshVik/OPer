@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <iostream>
 #include <future>
-#include <chrono>
 #include <cstring>
 
 // Вспомогательная функция: выполнить команду с таймаутом.
@@ -58,10 +57,10 @@ static bool executeAction(const Action& act, int depth = 0) {
     bool success = (ret == 0);
 
     if (ret == -2) {
-        std::cout << indent << "OPer: Timeout expired for command" << std::endl;
+        std::cout << indent << "OPer: Timeout expired" << std::endl;
         if (act.has_on_timeout()) {
             std::cout << indent << "OPer: Executing on_timeout action" << std::endl;
-            success = executeAction(act.on_timeout.value(), depth + 1);
+            success = executeAction(*act.on_timeout, depth + 1);
         } else {
             success = false;
         }
@@ -85,8 +84,7 @@ static void executeChain(std::shared_ptr<Algorithm> algo) {
     std::cout << "OPer: Starting action sequence for pattern" << std::endl;
     for (size_t i = 0; i < algo->actions.size(); ++i) {
         std::cout << "OPer: Step " << i+1 << "/" << algo->actions.size() << std::endl;
-        bool stepResult = executeAction(algo->actions[i], 1);
-        if (!stepResult) {
+        if (!executeAction(algo->actions[i], 1)) {
             std::cout << "OPer: Step failed, stopping sequence." << std::endl;
             return;
         }

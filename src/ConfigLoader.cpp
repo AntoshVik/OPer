@@ -12,7 +12,7 @@ static Action parseAction(const json& j) {
     act.timeout = j.value("timeout", 30);
     act.ignore_failure = j.value("ignore_failure", false);
     if (j.contains("on_timeout") && !j.at("on_timeout").is_null()) {
-        act.on_timeout = parseAction(j.at("on_timeout"));
+        act.on_timeout = std::make_unique<Action>(parseAction(j.at("on_timeout")));
     }
     return act;
 }

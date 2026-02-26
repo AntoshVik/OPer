@@ -2,6 +2,7 @@
 
 #include "Algorithm.h"
 #include <memory>
+#include <future>
 
 class ActionExecutor {
 public:
