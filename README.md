@@ -10,43 +10,20 @@ make
 
 Установка:
 ```bash
-sudo cp OPer /usr/local/bin/
-sudo mkdir -p /etc/OPer/algorithms
-# Поместить туда JSON-файлы с алгоритмами
-```
+# Установите nlohmann-json (например, apt-get install nlohmann-json3-dev)
+mkdir build && cd build
+cmake ..
+make
+sudo make install   # установит бинарник в /usr/local/bin/oper и скопирует конфигурацию/сервис
 
+# Создайте директорию для алгоритмов (если не создалась автоматически)
+sudo mkdir -p /etc/oper/algorithms
 
-Пример JSON:
-```json
-{
-    "pattern": "Serverclose failed 4 times, giving up",
-    "cooldown": 60,
-    "actions": [
-        {
-            "command": "systemctl stop myapp.service",
-            "timeout": 30,
-            "ignore_failure": false,
-            "on_timeout": {
-                "command": "systemctl kill myapp.service",
-                "timeout": 5,
-                "ignore_failure": true
-            }
-        },
-        {
-            "command": "umount /mnt/data",
-            "timeout": 10,
-            "ignore_failure": false,
-            "on_timeout": {
-                "command": "umount -l /mnt/data",
-                "timeout": 5,
-                "ignore_failure": true
-            }
-        },
-        {
-            "command": "systemctl start myapp.service",
-            "timeout": 30,
-            "ignore_failure": false
-        }
-    ]
-}
+# Скопируйте свои JSON-алгоритмы
+sudo cp ../config/example.json /etc/oper/algorithms/
+
+# Перезагрузите systemd и запустите сервис
+sudo systemctl daemon-reload
+sudo systemctl enable oper.service
+sudo systemctl start oper.service
 ```
