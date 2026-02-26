@@ -5,15 +5,18 @@
 
 class LogMonitor {
 public:
-    explicit LogMonitor(const std::string& filename);
+    explicit LogMonitor(const std::string& source);
     ~LogMonitor();
 
-    bool open();                        // открыть файл, перейти в конец
-    std::vector<std::string> getNewLines(); // прочитать новые строки (с обработкой ротации)
+    bool open();
+    std::vector<std::string> getNewLines();
 
 private:
-    std::string filename_;
-    int fd_;                             // файловый дескриптор
-    off_t last_pos_;                      // последняя прочитанная позиция
-    bool checkRotation();                 // проверка, не был ли файл пересоздан
+    std::string source_;
+    int fd_;
+    bool use_kmsg_;
+    off_t last_pos_;          // для файлового режима
+    std::string leftover_;     // для неполных строк в файловом режиме
+
+    bool checkRotation();      // для файлового режима
 };
