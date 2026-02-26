@@ -1,10 +1,10 @@
 [Unit]
-Description=OPer Error Monitor and Recovery
+Description=OPer - Error Monitor and Recovery tool
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/OPer /etc/OPer/algorithms
+ExecStart=/usr/local/bin/oper /etc/oper/algorithms
 Restart=always
 RestartSec=10
 User=root

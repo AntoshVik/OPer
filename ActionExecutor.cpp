@@ -4,6 +4,8 @@
 #include <signal.h>
 #include <errno.h>
 #include <iostream>
+#include <thread>
+#include <future>
 #include <chrono>
 
 int ActionExecutor::runCommand(const std::string& cmd, int timeoutSec) {
@@ -13,15 +15,13 @@ int ActionExecutor::runCommand(const std::string& cmd, int timeoutSec) {
         return -1;
     }
     if (pid == 0) {
-        // дочерний процесс
         execl("/bin/sh", "sh", "-c", cmd.c_str(), nullptr);
-        _exit(127); // если exec не удался
+        _exit(127);
     }
-    // родитель
     int status;
     struct sigaction sa, old_sa;
     memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = [](int) {}; // пустой обработчик, только чтобы прервать waitpid
+    sa.sa_handler = [](int) {};
     sigaction(SIGALRM, &sa, &old_sa);
     alarm(timeoutSec);
     pid_t w = waitpid(pid, &status, 0);
@@ -30,46 +30,69 @@ int ActionExecutor::runCommand(const std::string& cmd, int timeoutSec) {
     sigaction(SIGALRM, &old_sa, nullptr);
 
     if (w == -1 && saved_errno == EINTR) {
-        // таймаут
         kill(pid, SIGKILL);
-        waitpid(pid, nullptr, 0); // убрать зомби
-        return -2; // специальное значение: таймаут
+        waitpid(pid, nullptr, 0);
+        return -2; // timeout
     }
     if (WIFEXITED(status)) {
         return WEXITSTATUS(status);
     }
-    return -1; // другой сбой
+    return -1;
 }
 
-bool ActionExecutor::executeAction(const Action& act, int depth) {
+bool ActionExecutor::executeAction(const Action& act, int depth, bool& overall_failure) {
     std::string indent(depth * 2, ' ');
-    std::cout << indent << "Executing: " << act.command << " (timeout " << act.timeout << "s)" << std::endl;
+    std::cout << indent << "Executing: " << act.command << " (timeout " << act.timeout << "s, ignore_failure=" << act.ignore_failure << ")" << std::endl;
     int ret = runCommand(act.command, act.timeout);
+    bool failed = false;
     if (ret == -2) {
         std::cout << indent << "Timeout expired" << std::endl;
         if (act.has_on_timeout()) {
             std::cout << indent << "Executing on_timeout action" << std::endl;
-            return executeAction(act.on_timeout.value(), depth + 1);
+            // on_timeout выполняется вне зависимости от ignore_failure? Да, это специальная ветка.
+            // Здесь ignore_failure относится к этой ветке, но логика: если on_timeout сработал и у него свой ignore_failure.
+            if (!executeAction(act.on_timeout.value(), depth + 1, overall_failure)) {
+                failed = true;
+            }
+        } else {
+            failed = true; // таймаут без обработчика считается ошибкой
         }
-        return false; // можно считать, что действие не выполнено успешно
     } else if (ret != 0) {
         std::cout << indent << "Command failed with exit code " << ret << std::endl;
-        // можно продолжить или прервать – по условию продолжаем
+        failed = true;
     } else {
         std::cout << indent << "Command succeeded" << std::endl;
+    }
+
+    if (failed) {
+        if (act.ignore_failure) {
+            std::cout << indent << "Failure ignored, continuing." << std::endl;
+            return true; // не прерываем цепочку, но отмечаем общий сбой, если нужно? Можно не отмечать.
+        } else {
+            overall_failure = true;
+            return false; // прерываем цепочку
+        }
     }
     return true;
 }
 
-bool ActionExecutor::execute(const Algorithm& algo) {
-    std::cout << "Starting action sequence for pattern: " << algo.pattern << std::endl;
-    for (size_t i = 0; i < algo.actions.size(); ++i) {
-        std::cout << "Step " << i+1 << "/" << algo.actions.size() << std::endl;
-        if (!executeAction(algo.actions[i], 1)) {
-            std::cout << "Step failed, stopping sequence." << std::endl;
-            return false;
+void ActionExecutor::executeInternal(std::shared_ptr<Algorithm> algo) {
+    std::cout << "Starting action sequence for pattern: " << algo->pattern_str << std::endl;
+    bool overall_failure = false;
+    for (size_t i = 0; i < algo->actions.size(); ++i) {
+        std::cout << "Step " << i+1 << "/" << algo->actions.size() << std::endl;
+        if (!executeAction(algo->actions[i], 1, overall_failure)) {
+            std::cout << "Step failed with no ignore_failure, stopping sequence." << std::endl;
+            break;
         }
     }
-    std::cout << "Action sequence completed." << std::endl;
-    return true;
+    if (overall_failure) {
+        std::cout << "Action sequence completed with some failures (ignored)." << std::endl;
+    } else {
+        std::cout << "Action sequence completed successfully." << std::endl;
+    }
+}
+
+std::future<void> ActionExecutor::executeAsync(std::shared_ptr<Algorithm> algo) {
+    return std::async(std::launch::async, [algo]() { executeInternal(algo); });
 }

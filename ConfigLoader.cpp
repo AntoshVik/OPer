@@ -10,6 +10,7 @@ static Action parseAction(const json& j) {
     Action act;
     act.command = j.at("command").get<std::string>();
     act.timeout = j.value("timeout", 30);
+    act.ignore_failure = j.value("ignore_failure", false);
     if (j.contains("on_timeout") && !j.at("on_timeout").is_null()) {
         act.on_timeout = parseAction(j.at("on_timeout"));
     }
@@ -31,7 +32,8 @@ std::vector<Algorithm> ConfigLoader::loadFromDirectory(const std::string& dirPat
             json j;
             f >> j;
             Algorithm algo;
-            algo.pattern = j.at("pattern").get<std::string>();
+            algo.pattern_str = j.at("pattern").get<std::string>();
+            algo.pattern = std::regex(algo.pattern_str, std::regex::extended); // или ECMAScript по умолчанию
             algo.cooldown = j.value("cooldown", 0);
             algo.last_trigger = std::chrono::steady_clock::time_point::min();
 
@@ -39,7 +41,7 @@ std::vector<Algorithm> ConfigLoader::loadFromDirectory(const std::string& dirPat
                 algo.actions.push_back(parseAction(act_j));
             }
             algorithms.push_back(std::move(algo));
-            std::cout << "Loaded algorithm: " << algo.pattern << std::endl;
+            std::cout << "Loaded algorithm: " << algo.pattern_str << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Error parsing " << entry.path() << ": " << e.what() << std::endl;
         }
