@@ -16,3 +16,37 @@ sudo mkdir -p /etc/OPer/algorithms
 ```
 
 
+Пример JSON:
+```json
+{
+    "pattern": "Serverclose failed 4 times, giving up",
+    "cooldown": 60,
+    "actions": [
+        {
+            "command": "systemctl stop myapp.service",
+            "timeout": 30,
+            "ignore_failure": false,
+            "on_timeout": {
+                "command": "systemctl kill myapp.service",
+                "timeout": 5,
+                "ignore_failure": true
+            }
+        },
+        {
+            "command": "umount /mnt/data",
+            "timeout": 10,
+            "ignore_failure": false,
+            "on_timeout": {
+                "command": "umount -l /mnt/data",
+                "timeout": 5,
+                "ignore_failure": true
+            }
+        },
+        {
+            "command": "systemctl start myapp.service",
+            "timeout": 30,
+            "ignore_failure": false
+        }
+    ]
+}
+```
