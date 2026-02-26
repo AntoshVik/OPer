@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/oper /etc/oper/algorithms
+ExecStart=/usr/local/bin/oper
 Restart=always
 RestartSec=10
 User=root

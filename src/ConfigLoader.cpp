@@ -17,7 +17,7 @@ static Action parseAction(const json& j) {
     return act;
 }
 
-std::vector<Algorithm> ConfigLoader::loadFromDirectory(const std::string& dirPath) {
+std::vector<Algorithm> ConfigLoader::loadFromDirectory(const std::string& dirPath, int default_cooldown) {
     std::vector<Algorithm> algorithms;
     namespace fs = std::filesystem;
 
@@ -38,7 +38,7 @@ std::vector<Algorithm> ConfigLoader::loadFromDirectory(const std::string& dirPat
             f >> j;
             Algorithm algo;
             algo.pattern = std::regex(j.at("pattern").get<std::string>());
-            algo.cooldown = j.value("cooldown", 0);
+            algo.cooldown = j.value("cooldown", default_cooldown);  // используем переданное значение
             algo.last_trigger = std::chrono::steady_clock::time_point::min();
 
             for (const auto& act_j : j.at("actions")) {

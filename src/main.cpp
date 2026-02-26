@@ -1,6 +1,7 @@
 #include "ConfigLoader.h"
 #include "LogMonitor.h"
 #include "ActionExecutor.h"
+#include "Settings.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -14,8 +15,8 @@
 
 static std::atomic<bool> running(true);
 static std::shared_timed_mutex algorithms_mutex;
-static std::vector<Algorithm> algorithms;  // теперь вектор объектов, не указателей
-static std::string configDir;
+static std::vector<Algorithm> algorithms;
+static Settings settings;                  // глобальные настройки
 static std::filesystem::file_time_type last_config_load;
 
 void signal_handler(int) {
@@ -24,7 +25,7 @@ void signal_handler(int) {
 
 void reloadConfigIfChanged() {
     namespace fs = std::filesystem;
-    auto configDirPath = fs::path(configDir);
+    auto configDirPath = fs::path(settings.algorithms_dir);
     if (!fs::exists(configDirPath) || !fs::is_directory(configDirPath)) return;
 
     auto current_mtime = fs::last_write_time(configDirPath);
@@ -42,10 +43,10 @@ void reloadConfigIfChanged() {
     if (!changed && current_mtime <= last_config_load) return;
 
     std::cout << "OPer: Config directory changed, reloading..." << std::endl;
-    auto new_algorithms = ConfigLoader::loadFromDirectory(configDir);
+    auto new_algorithms = ConfigLoader::loadFromDirectory(settings.algorithms_dir, settings.default_cooldown);
     {
         std::unique_lock<std::shared_timed_mutex> lock(algorithms_mutex);
-        algorithms = std::move(new_algorithms);  // теперь типы совпадают
+        algorithms = std::move(new_algorithms);
         last_config_load = fs::file_time_type::clock::now();
     }
 }
@@ -54,26 +55,30 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    configDir = "/etc/oper/algorithms";
-    if (argc > 1) configDir = argv[1];
+    // Загрузка настроек (можно передать путь как аргумент командной строки)
+    std::string config_path = "/etc/oper/oper.conf";
+    if (argc > 1) config_path = argv[1];
+    settings = loadSettings(config_path);
 
-    algorithms = ConfigLoader::loadFromDirectory(configDir);
+    algorithms = ConfigLoader::loadFromDirectory(settings.algorithms_dir, settings.default_cooldown);
     if (algorithms.empty()) {
         std::cerr << "OPer: No algorithms loaded. Exiting." << std::endl;
         return 1;
     }
     namespace fs = std::filesystem;
-    if (fs::exists(configDir)) {
-        last_config_load = fs::last_write_time(configDir);
+    if (fs::exists(settings.algorithms_dir)) {
+        last_config_load = fs::last_write_time(settings.algorithms_dir);
     }
 
-    LogMonitor monitor("/var/log/kern.log");
+    LogMonitor monitor(settings.log_file);
     if (!monitor.open()) {
-        std::cerr << "OPer: Cannot open /var/log/kern.log" << std::endl;
+        std::cerr << "OPer: Cannot open log file: " << settings.log_file << std::endl;
         return 1;
     }
 
-    std::cout << "OPer started. Monitoring " << configDir << " for algorithms. Press Ctrl+C to stop." << std::endl;
+    std::cout << "OPer started. Monitoring " << settings.log_file
+              << " for algorithms in " << settings.algorithms_dir
+              << ". Press Ctrl+C to stop." << std::endl;
 
     auto last_reload_check = std::chrono::steady_clock::now();
 
@@ -81,7 +86,7 @@ int main(int argc, char* argv[]) {
         auto lines = monitor.getNewLines();
 
         auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_reload_check).count() >= 5) {
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_reload_check).count() >= settings.reload_interval) {
             reloadConfigIfChanged();
             last_reload_check = now;
         }
@@ -97,11 +102,10 @@ int main(int argc, char* argv[]) {
                         if (elapsed >= algo.cooldown) {
                             std::cout << "OPer: Match found: " << line << std::endl;
 
-                            // Создаём shared_ptr из копии алгоритма для асинхронного выполнения
                             auto algo_copy = std::make_shared<Algorithm>(algo);
-                            // Обновляем время последнего срабатывания в оригинале
                             const_cast<Algorithm&>(algo).last_trigger = now;
 
+                            // TODO: ограничение параллельных задач (max_parallel_tasks)
                             ActionExecutor::executeAsync(algo_copy);
                         } else {
                             std::cout << "OPer: Match ignored (cooldown active for "

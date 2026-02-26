@@ -4,20 +4,10 @@ project(OPer)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Для std::filesystem может потребоваться отдельная библиотека
-# Проверим версию GCC
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-    set(FS_LIB stdc++fs)
-else()
-    set(FS_LIB stdc++)  # начиная с gcc 9 filesystem встроена в stdc++
-endif()
-
-# Для pthread
-find_package(Threads REQUIRED)
+# Путь к локальному архиву (если есть)
+set(JSON_LOCAL_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/external/json.tar.xz")
 
 include(FetchContent)
-
-set(JSON_LOCAL_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/external/json.tar.xz")
 
 if(EXISTS "${JSON_LOCAL_ARCHIVE}")
     message(STATUS "Using local json.tar.xz from ${JSON_LOCAL_ARCHIVE}")
@@ -35,19 +25,28 @@ endif()
 
 FetchContent_MakeAvailable(nlohmann_json)
 
+# Подключаем pthread и filesystem
+find_package(Threads REQUIRED)
+
 add_executable(oper
     src/main.cpp
     src/ConfigLoader.cpp
     src/LogMonitor.cpp
     src/ActionExecutor.cpp
+    src/Settings.cpp          # новый файл
 )
 
 target_link_libraries(oper PRIVATE
     nlohmann_json::nlohmann_json
     Threads::Threads
-    ${FS_LIB}
+    stdc++fs                  # для GCC < 9 (libstdc++fs)
 )
 
+# Для GCC >= 9 stdc++fs не нужен, но лишним не будет
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
+    target_link_libraries(oper PRIVATE stdc++fs)
+endif()
+
 install(TARGETS oper DESTINATION /usr/local/bin)
-install(DIRECTORY config/ DESTINATION /etc/oper/algorithms)
+install(DIRECTORY config/ DESTINATION /etc/oper)
 install(FILES oper.service DESTINATION /etc/systemd/system)
