@@ -1,0 +1,18 @@
+[Unit]
+Description=OPer Error Monitor and Recovery
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/OPer /etc/OPer/algorithms
+Restart=always
+RestartSec=10
+User=root
+Group=root
+StandardOutput=journal
+StandardError=journal
+CPUQuota=10%
+MemoryMax=50M
+
+[Install]
+WantedBy=multi-user.target
