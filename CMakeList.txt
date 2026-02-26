@@ -1,16 +1,23 @@
 cmake_minimum_required(VERSION 3.10)
-project(CIFSMonitor)
+project(OPer)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Подключение nlohmann/json (можно через FetchContent или установить системно)
+# Поиск nlohmann_json (установите через пакетный менеджер или используйте FetchContent)
 find_package(nlohmann_json REQUIRED)
 
-add_executable(cifs-monitor
-    main.cpp
-    ConfigLoader.cpp
-    LogMonitor.cpp
-    ActionExecutor.cpp
+# Добавление исполняемого файла
+add_executable(oper
+    src/main.cpp
+    src/ConfigLoader.cpp
+    src/LogMonitor.cpp
+    src/ActionExecutor.cpp
 )
 
-target_link_libraries(cifs-monitor PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(oper PRIVATE nlohmann_json::nlohmann_json)
+
+# Опционально: установка
+install(TARGETS oper DESTINATION /usr/local/bin)
+install(DIRECTORY config/ DESTINATION /etc/oper/algorithms)
+install(FILES oper.service DESTINATION /etc/systemd/system)
