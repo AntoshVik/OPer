@@ -28,26 +28,29 @@ void reloadConfigIfChanged() {
     auto configDirPath = fs::path(settings.algorithms_dir);
     if (!fs::exists(configDirPath) || !fs::is_directory(configDirPath)) return;
 
-    auto current_mtime = fs::last_write_time(configDirPath);
+    // Определяем самое свежее время модификации среди JSON-файлов
+    fs::file_time_type latest_mtime = fs::file_time_type::min();
     bool changed = false;
+
     for (const auto& entry : fs::directory_iterator(configDirPath)) {
         if (entry.path().extension() != ".json") continue;
         auto file_mtime = fs::last_write_time(entry.path());
-        if (file_mtime > current_mtime) {
-            current_mtime = file_mtime;
+        if (file_mtime > latest_mtime) {
+            latest_mtime = file_mtime;
         }
         if (file_mtime > last_config_load) {
             changed = true;
         }
     }
-    if (!changed && current_mtime <= last_config_load) return;
+
+    if (!changed) return;
 
     std::cout << "OPer: Config directory changed, reloading..." << std::endl;
     auto new_algorithms = ConfigLoader::loadFromDirectory(settings.algorithms_dir, settings.default_cooldown);
     {
         std::unique_lock<std::shared_timed_mutex> lock(algorithms_mutex);
         algorithms = std::move(new_algorithms);
-        last_config_load = fs::file_time_type::clock::now();
+        last_config_load = latest_mtime; // обновляем на самое свежее время
     }
 }
 
@@ -66,8 +69,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     namespace fs = std::filesystem;
-    if (fs::exists(settings.algorithms_dir)) {
-        last_config_load = fs::last_write_time(settings.algorithms_dir);
+    if (fs::exists(settings.algorithms_dir) && fs::is_directory(settings.algorithms_dir)) {
+        last_config_load = fs::file_time_type::min();
+        for (const auto& entry : fs::directory_iterator(settings.algorithms_dir)) {
+            if (entry.path().extension() == ".json") {
+                auto ftime = fs::last_write_time(entry.path());
+                if (ftime > last_config_load)
+                    last_config_load = ftime;
+            }
+        }
+    } else {
+        last_config_load = fs::file_time_type::clock::now();
     }
 
     LogMonitor monitor(settings.log_file);
@@ -99,7 +111,7 @@ int main(int argc, char* argv[]) {
                         auto now = std::chrono::steady_clock::now();
                         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
                             now - algo.last_trigger).count();
-                        if (elapsed >= algo.cooldown) {
+                        if (elapsed >= algo.cooldown || algo.last_trigger == std::chrono::steady_clock::time_point::min() ) {
                             std::cout << "OPer: Match found: " << line << std::endl;
 
                             auto algo_copy = std::make_shared<Algorithm>(algo);

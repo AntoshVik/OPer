@@ -51,14 +51,14 @@ struct Algorithm {
     std::chrono::steady_clock::time_point last_trigger;
     mutable std::shared_ptr<int> alive_flag; // для отслеживания времени жизни копий
 
-    Algorithm() : cooldown(0), alive_flag(std::make_shared<int>(0)) {}
+    Algorithm() : cooldown(0), last_trigger(std::chrono::steady_clock::time_point::min()), alive_flag(std::make_shared<int>(0)) {}
     
     // Конструктор копирования
     Algorithm(const Algorithm& other)
         : pattern(other.pattern),
-          cooldown(other.cooldown),
+          cooldown(0),
           actions(other.actions),
-          last_trigger(other.last_trigger),
+          last_trigger(std::chrono::steady_clock::time_point::min()), 
           alive_flag(std::make_shared<int>(0)) // новый флаг, не копируем
     {}
     
