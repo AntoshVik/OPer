@@ -1,4 +1,3 @@
-```markdown
 # OPer — Error Monitor and Recovery tool
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -384,4 +383,3 @@ MIT. See [LICENSE](LICENSE) for details.
 Developed by AntoshVik and contributors.
 
 Feel free to open issues or pull requests.
-```
