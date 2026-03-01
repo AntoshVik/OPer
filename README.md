@@ -31,8 +31,8 @@
 ### Сборка из исходников
 
 ```bash
-git clone https://github.com/your-repo/oper.git
-cd oper
+git clone https://github.com/AntoshVik/OPer.git
+cd OPer
 mkdir build && cd build
 cmake ..
 make
@@ -194,7 +194,7 @@ oper/
 
 ## 🤝 Авторы
 
-Разработано AntoshVik и сообществом.
+Разработано AntoshVik.
 
 Если у вас есть вопросы или предложения, создавайте issue или pull request.
 
@@ -229,8 +229,8 @@ oper/
 #### Build from source
 
 ```bash
-git clone https://github.com/your-repo/oper.git
-cd oper
+git clone https://github.com/AntoshVik/OPer.git
+cd OPer
 mkdir build && cd build
 cmake ..
 make
@@ -380,6 +380,6 @@ MIT. See [LICENSE](LICENSE) for details.
 
 ### Authors
 
-Developed by AntoshVik and contributors.
+Developed by AntoshVik.
 
 Feel free to open issues or pull requests.
