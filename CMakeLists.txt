@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
 project(OPer)
 
+cmake_policy(SET CMP0135 NEW)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -33,7 +35,7 @@ add_executable(oper
     src/ConfigLoader.cpp
     src/LogMonitor.cpp
     src/ActionExecutor.cpp
-    src/Settings.cpp          # новый файл
+    src/Settings.cpp
 )
 
 target_link_libraries(oper PRIVATE
